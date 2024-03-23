@@ -136,6 +136,8 @@ int main()
     std::string intentionMultiplied, intentionHashed = "";
     long long unsigned int RAM_SIZE = 1024 * 1024 * 1024 * numGBToUse / 2, multiplier = 0, hashMultiplier = 0;
 
+    std::cout << "Loading..." << string(10,' ') << "\r" << flush;
+
     // Append intention repeatedly to intentionMultiplied until the length of intentionMultiplied >= (1024*1024*1024*numGBToUse/2)
     while (intentionMultiplied.length() < RAM_SIZE)
     {
@@ -166,8 +168,8 @@ int main()
         auto end = start + std::chrono::seconds(1);
         while (std::chrono::high_resolution_clock::now() < end)
         {
-            ++freq;
             processIntention = intentionMultiplied;
+            freq++;
         }
 
         totalFreq = std::to_string(freq * multiplier);
@@ -178,7 +180,9 @@ int main()
         freq = 0;
 
         std::cout << "[" + FormatTime(seconds) + "] Repeating: "
-                  << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations") << " / " << DisplaySuffix(totalFreq, freq_digits - 1, "Frequency") << "Hz)" << std::string(5, ' ') << "\r" << std::flush;
+                  << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
+                  << " / " << DisplaySuffix(totalFreq, freq_digits - 1, "Frequency") << "Hz)"
+                  << std::string(5, ' ') << "\r" << std::flush;
     }
 
     return 0;
