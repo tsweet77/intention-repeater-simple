@@ -1,7 +1,8 @@
 # Intention Repeater Simple
 A simple Intention Repeater created with help from WebGPT.
 
-This says in frequency display that it runs about 1000X slower than the regular Intention Repeater MAX.
+This says in frequency display that it runs about 1000X slower than
+the regular Intention Repeater MAX (when not using Hashing).
 
 I think that the regular Intention Repeater may be misleading.
 
