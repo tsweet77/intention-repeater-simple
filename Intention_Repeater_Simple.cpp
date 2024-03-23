@@ -179,7 +179,7 @@ int main()
         ++seconds;
         freq = 0;
 
-        std::cout << "[" + FormatTime(seconds) + "] Repeating: "
+        std::cout << "[" + FormatTime(seconds) + "] Repeating:"
                   << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
                   << " / " << DisplaySuffix(totalFreq, freq_digits - 1, "Frequency") << "Hz)"
                   << std::string(5, ' ') << "\r" << std::flush;

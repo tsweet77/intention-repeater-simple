@@ -193,11 +193,12 @@ int main()
         threads[i] = thread(ProcessIntention, i, intentionMultiplied);
     }
 
-string totalIterations = "0";
+    unsigned long long totalFreq = 0, seconds = 0;
+    string totalIterations = "0";
+
     while (running) {
         this_thread::sleep_for(chrono::seconds(1)); // Wait for 1 second
 
-        unsigned long long totalFreq = 0, seconds = 0;
         for (int i = 0; i < NUM_THREADS; ++i) {
             totalFreq += freqs[i]; // Sum all frequencies
             freqs[i] = 0; // Reset for the next count
@@ -207,13 +208,13 @@ string totalIterations = "0";
         totalIterations = FindSum(totalIterations, freqStr);
         int digits = totalIterations.length();
         int freq_digits = freqStr.length();
+        totalFreq = 0;
 
         lock_guard<mutex> lock(io_mutex);
-        cout << "[" << FormatTime(++seconds) << "] Repeating: "
+        cout << "[" << FormatTime(++seconds) << "] Repeating:"
              << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
              << " / " << DisplaySuffix(freqStr, freq_digits - 1, "Frequency") << "Hz)"
              << string(5, ' ') << "\r" << flush;
-        seconds++;
     }
 
     for (auto& th : threads) {
