@@ -105,6 +105,10 @@ int main()
 {
     std::string intention;
     int numGBToUse = 1;
+    
+    std::cout << "Intention Repeater Simple" << endl;
+    std::cout << "by Anthro Teacher and WebGPT" << endl << endl;
+    
     while (true)
     { // Infinite loop
         std::cout << "Enter your Intention: ";

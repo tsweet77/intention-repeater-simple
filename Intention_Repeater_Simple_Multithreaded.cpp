@@ -135,6 +135,9 @@ int main()
 
     thread threads[NUM_THREADS];
 
+    std::cout << "Intention Repeater Simple (Multithreaded)" << endl;
+    std::cout << "by Anthro Teacher and WebGPT" << endl << endl;
+
     std::string intention;
     int numGBToUse = 1;
     while (true)
