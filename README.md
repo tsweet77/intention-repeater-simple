@@ -9,3 +9,5 @@ I think that the regular Intention Repeater may be misleading.
 The regular Intention Repeater MAX does not use Hashing.
 
 This one may represent truer iterations and frequency count values.
+
+Code requires picosha2.h
