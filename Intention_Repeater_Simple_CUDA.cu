@@ -301,16 +301,17 @@ int main(int argc, char **argv)
         ++seconds;
         freq = 0;
 
-        cout << "[" + FormatTime(seconds) + "] Repeating:"
+        std::cout << "[" + FormatTime(seconds) + "] Repeating:"
              << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
              << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention
              << string(5, ' ') << "\r" << flush;
         if (param_duration == FormatTime(seconds))
         {
-            interrupted = true;
+             interrupted = true;
         }
     }
 
+    std::cout << endl;
     // Free allocated memory on the GPU
     cudaFree(d_intentionMultiplied);
     cudaFree(d_freq);
