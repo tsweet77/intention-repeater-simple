@@ -23,21 +23,11 @@ To compile: nvcc -o Intention_Repeater_Simple_CUDA.exe Intention_Repeater_Simple
 using namespace std;
 
 // CUDA kernel to perform intention repeating and frequency updating
-__global__ void intentionRepeaterKernel(char* intentionMultiplied, unsigned long long int* freq, unsigned long long int amplification, size_t intentionSize) {
-    unsigned long long int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < amplification) {
-        char* processIntention = intentionMultiplied;
-        atomicAdd(freq, 1);
-    }
-}
-
-// CUDA kernel to perform intention hashing
-__global__ void intentionHashingKernel(char* intentionMultiplied, char* intentionHashed, size_t intentionSize) {
+__global__ void intentionRepeaterKernel(char* intentionMultiplied, unsigned long long int* freq, size_t intentionSize) {
     unsigned long long int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < intentionSize) {
-        // Perform hashing using a device-compatible hash function
-        // Here, we just copy the character from intentionMultiplied to intentionHashed
-        intentionHashed[i] = intentionMultiplied[i];
+        char* processIntention = intentionMultiplied;
+        atomicAdd(freq, 1);
     }
 }
 
@@ -64,8 +54,7 @@ std::string DisplaySuffix(std::string num, int power, std::string designator)
     return result;
 }
 
-// Utility function to find the sum of two numbers represented as a string in
-// CPP
+// Utility function to find the sum of two numbers represented as a string in CPP
 std::string FindSum(std::string a, std::string b)
 {
 
@@ -165,7 +154,7 @@ int main()
     int numGBToUse = 1;
     
     std::cout << "Intention Repeater Simple CUDA" << endl;
-    std::cout << "by Anthro Teacher and WebGPT" << endl << endl;
+    std::cout << "by Anthro Teacher, WebGPT and Claude 3 Opus" << endl << endl;
     
     while (true)
     { // Infinite loop
@@ -238,14 +227,18 @@ int main()
     {
         auto start = std::chrono::high_resolution_clock::now();
         auto end = std::chrono::high_resolution_clock::now();
-        while ((std::chrono::duration_cast<std::chrono::seconds>(end - start).count() < 1)) {
+        while ((std::chrono::duration_cast<std::chrono::seconds>(end - start).count() < 1))
+        {
             // Set freq to 0 on the GPU
             cudaMemset(d_freq, 0, sizeof(unsigned long long int));
 
             // Launch the CUDA kernel for intention repeating and frequency updating
             int blockSize = 256;
-            int numBlocks = (amplification + blockSize - 1) / blockSize;
-            intentionRepeaterKernel<<<numBlocks, blockSize>>>(d_intentionMultiplied, d_freq, amplification, intentionMultiplied.size());
+            int numBlocks = (intentionMultiplied.size() + blockSize - 1) / blockSize;
+            intentionRepeaterKernel<<<numBlocks, blockSize>>>(d_intentionMultiplied, d_freq, intentionMultiplied.size());
+
+            // Wait for the GPU to finish before accessing on host
+            cudaDeviceSynchronize();
 
             // Copy the updated freq back to the CPU
             cudaMemcpy(&freq, d_freq, sizeof(unsigned long long int), cudaMemcpyDeviceToHost);
