@@ -57,7 +57,7 @@ string MultiplyStrings(const string& num1, const string& num2) {
 }
 
 string DisplaySuffix(const string& num, int power, const string& designator) {
-    const string suffixArray = designator == "Iterations" ? " kMBTqQsSOND" : " kMGTPEZY";
+    const string suffixArray = designator == "Iterations" ? " kMBTqQsSOND" : " kMGTPEZYR";
     size_t index = power / 3;
     char suffix = index < suffixArray.length() ? suffixArray[index] : ' ';
     string result = num.substr(0, power % 3 + 1) + "." + num.substr(power % 3 + 1, 3) + suffix;
