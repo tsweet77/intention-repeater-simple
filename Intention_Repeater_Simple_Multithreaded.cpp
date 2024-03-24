@@ -1,3 +1,9 @@
+/*
+Intention Repeater Simple (Multithreaded)
+by Anthro Teacher, WebGPT and Claude 3 Opus
+To compile: g++ -O3 -Wall -static Intention_Repeater_Simple_Multithreaded.cpp -o Intention_Repeater_Simple_Multithreaded.exe -lz
+*/
+
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -12,6 +18,7 @@
 #include <algorithm>
 #include "picosha2.h"
 #include <cstring>
+#include "zlib.h"
 
 #define ONE_MINUTE 60
 #define ONE_HOUR 3600
@@ -26,7 +33,46 @@ mutex io_mutex;
 void signalHandler(int signum)
 {
     cout << "\nInterrupt signal (" << signum << ") received.\n";
-    interrupted = false;
+    interrupted = true;
+}
+
+std::string compressMessage(const std::string &message)
+{
+    z_stream zs;
+    memset(&zs, 0, sizeof(zs));
+
+    if (deflateInit(&zs, Z_DEFAULT_COMPRESSION) != Z_OK)
+    {
+        return ""; // Compression initialization failed
+    }
+
+    zs.next_in = (Bytef *)message.data();
+    zs.avail_in = message.size();
+
+    std::string compressed;
+    char outbuffer[32768]; // Output buffer
+    int ret;
+    do
+    {
+        zs.next_out = reinterpret_cast<Bytef *>(outbuffer);
+        zs.avail_out = sizeof(outbuffer);
+
+        ret = deflate(&zs, Z_FINISH);
+
+        if (compressed.size() < zs.total_out)
+        {
+            compressed.append(outbuffer, zs.total_out - compressed.size());
+        }
+    } while (ret == Z_OK);
+
+    deflateEnd(&zs);
+
+    if (ret != Z_STREAM_END)
+    {
+        return ""; // Compression failed
+    }
+
+    return compressed;
 }
 
 string MultiplyStrings(const string &num1, const string &num2)
@@ -165,7 +211,7 @@ std::string FindSum(std::string a, std::string b)
 
 void print_help()
 {
-    cout << "Intention Repeater Simple (Multithreaded) by Anthro Teacher." << endl;
+    cout << "Intention Repeater Simple by Anthro Teacher." << endl;
     cout << "Repeats your intention millions of times per second " << endl;
     cout << "in computer memory, to aid in manifestation." << endl;
     cout << "Optional Flags:" << endl;
@@ -174,7 +220,8 @@ void print_help()
     cout << "    --imem 0 to disable Intention Multiplying" << endl;
     cout << " c) --dur or -d, example: --dur 00:01:00 [Running Duration HH:MM:SS]" << endl;
     cout << " d) --hashing or -h, example: --hashing y [Use Hashing]" << endl;
-    cout << " e) --help or -? [This help]" << endl;
+    cout << " e) --compress or -c, example: --compress y [Use Compression]" << endl;
+    cout << " f) --help or -? [This help]" << endl;
 }
 
 int main(int argc, char **argv)
@@ -183,7 +230,8 @@ int main(int argc, char **argv)
 
     thread threads[NUM_THREADS];
 
-    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY", param_hashing = "X", useHashing;
+    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY", param_hashing = "X";
+    string useHashing, param_compress = "X", useCompression;
     int numGBToUse = 1;
 
     for (int i = 1; i < argc; i++)
@@ -208,6 +256,10 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--hashing"))
         {
             param_hashing = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "--compress"))
+        {
+            param_compress = argv[i + 1];
         }
     }
 
@@ -263,6 +315,17 @@ int main(int argc, char **argv)
         useHashing = param_hashing;
     }
 
+    if (param_compress == "X")
+    {
+        cout << "Use Compression (y/N): ";
+        getline(cin, useCompression);
+        transform(useCompression.begin(), useCompression.end(), useCompression.begin(), ::tolower);
+    }
+    else
+    {
+        useCompression = param_compress;
+    }
+
     std::string intentionMultiplied, intentionHashed = "";
     long long unsigned int ramSize = 1024 * 1024 * 1024 * numGBToUse / 2, multiplier = 0, hashMultiplier = 0;
 
@@ -299,6 +362,13 @@ int main(int argc, char **argv)
             intentionMultiplied = intentionHashed;
             hashMultiplier = 1;
         }
+    } else {
+        hashMultiplier = 1;
+    }
+
+    if (useCompression == "y" || useCompression == "yes")
+    {
+        intentionMultiplied = compressMessage(intentionMultiplied);
     }
 
     for (int i = 0; i < NUM_THREADS; ++i)
@@ -346,5 +416,6 @@ int main(int argc, char **argv)
         }
     }
 
+    std::cout << endl;
     return 0;
 }

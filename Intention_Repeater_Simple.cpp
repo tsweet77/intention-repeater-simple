@@ -1,7 +1,7 @@
 /*
 Intention Repeater Simple
 by Anthro Teacher, WebGPT and Claude 3 Opus
-To compile: g++ -O3 -Wall -static Intention_Repeater_Simple.cpp -o Intention_Repeater_Simple.exe
+To compile: g++ -O3 -Wall -static Intention_Repeater_Simple.cpp -o Intention_Repeater_Simple.exe -lz
 */
 
 #include <iostream>
@@ -14,6 +14,7 @@ To compile: g++ -O3 -Wall -static Intention_Repeater_Simple.cpp -o Intention_Rep
 #include <cstring>
 #include <csignal>
 #include <atomic>
+#include "zlib.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -23,9 +24,49 @@ const int ONE_HOUR = 3600;
 
 std::atomic<bool> interrupted(false);
 
-void signalHandler(int signum) {
+void signalHandler(int signum)
+{
     cout << "\nInterrupt signal (" << signum << ") received.\n";
     interrupted.store(true);
+}
+
+std::string compressMessage(const std::string &message)
+{
+    z_stream zs;
+    memset(&zs, 0, sizeof(zs));
+
+    if (deflateInit(&zs, Z_DEFAULT_COMPRESSION) != Z_OK)
+    {
+        return ""; // Compression initialization failed
+    }
+
+    zs.next_in = (Bytef *)message.data();
+    zs.avail_in = message.size();
+
+    std::string compressed;
+    char outbuffer[32768]; // Output buffer
+    int ret;
+    do
+    {
+        zs.next_out = reinterpret_cast<Bytef *>(outbuffer);
+        zs.avail_out = sizeof(outbuffer);
+
+        ret = deflate(&zs, Z_FINISH);
+
+        if (compressed.size() < zs.total_out)
+        {
+            compressed.append(outbuffer, zs.total_out - compressed.size());
+        }
+    } while (ret == Z_OK);
+
+    deflateEnd(&zs);
+
+    if (ret != Z_STREAM_END)
+    {
+        return ""; // Compression failed
+    }
+
+    return compressed;
 }
 
 string FormatTime(long long seconds)
@@ -124,13 +165,14 @@ void print_help()
     cout << "    --imem 0 to disable Intention Multiplying" << endl;
     cout << " c) --dur or -d, example: --dur 00:01:00 [Running Duration HH:MM:SS]" << endl;
     cout << " d) --hashing or -h, example: --hashing y [Use Hashing]" << endl;
-    cout << " e) --help or -? [This help]" << endl;
+    cout << " e) --compress or -c, example: --compress y [Use Compression]" << endl;
+    cout << " f) --help or -? [This help]" << endl;
 }
 
 int main(int argc, char **argv)
 {
     std::signal(SIGINT, signalHandler);
-    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY", param_hashing = "X", useHashing;
+    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY", param_hashing = "X", useHashing, param_compress = "X", useCompression;
     int numGBToUse = 1;
 
     for (int i = 1; i < argc; i++)
@@ -155,6 +197,10 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--hashing"))
         {
             param_hashing = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "--compress"))
+        {
+            param_compress = argv[i + 1];
         }
     }
 
@@ -210,6 +256,17 @@ int main(int argc, char **argv)
         useHashing = param_hashing;
     }
 
+    if (param_compress == "X")
+    {
+        cout << "Use Compression (y/N): ";
+        getline(cin, useCompression);
+        transform(useCompression.begin(), useCompression.end(), useCompression.begin(), ::tolower);
+    }
+    else
+    {
+        useCompression = param_compress;
+    }
+
     string intentionMultiplied, intentionHashed;
     size_t ramSize = 1024ULL * 1024 * 1024 * numGBToUse / 2;
     size_t multiplier = 0, hashMultiplier = 1;
@@ -249,6 +306,11 @@ int main(int argc, char **argv)
         }
     }
 
+    if (useCompression == "y" || useCompression == "yes")
+    {
+        intentionMultiplied = compressMessage(intentionMultiplied);
+    }
+
     string totalIterations = "0", totalFreq = "0";
     unsigned long long freq = 0, seconds = 0;
 
@@ -273,14 +335,15 @@ int main(int argc, char **argv)
         freq = 0;
 
         cout << "[" + FormatTime(seconds) + "] Repeating:"
-            << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
-            << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention
-            << string(5, ' ') << "\r" << flush;
+             << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
+             << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention
+             << string(5, ' ') << "\r" << flush;
         if (param_duration == FormatTime(seconds))
         {
             interrupted = true;
         }
     }
 
+    std::cout << endl;
     return 0;
 }
