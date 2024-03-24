@@ -128,6 +128,37 @@ std::string FindSum(std::string a, std::string b)
     return final_iter.str();
 }
 
+std::string multiplyStrings(const std::string &num1, const std::string &num2) {
+    int len1 = num1.size();
+    int len2 = num2.size();
+    std::vector<int> result(len1 + len2, 0);
+
+    // Reverse both the numbers.
+    std::string n1 = num1;
+    std::string n2 = num2;
+
+    // Multiply each digit of second number with the first number
+    for (int i = len2 - 1; i >= 0; i--) {
+        for (int j = len1 - 1; j >= 0; j--) {
+            int mul = (n2[i] - '0') * (n1[j] - '0');
+            int sum = mul + result[i + j + 1];
+
+            result[i + j + 1] = sum % 10;
+            result[i + j] += sum / 10;
+        }
+    }
+
+    // Convert the result vector to string.
+    std::string resultStr;
+    for (int num : result) {
+        if (!(resultStr.empty() && num == 0)) { // Skip leading zeros
+            resultStr.push_back(num + '0');
+        }
+    }
+
+    return resultStr.empty() ? "0" : resultStr; // Return "0" if result is empty
+}
+
 int main()
 {
     std::string intention;
@@ -222,7 +253,8 @@ int main()
             end = std::chrono::high_resolution_clock::now();
         }
 
-        totalFreq = std::to_string(freq * multiplier * hashMultiplier);
+        totalFreq = multiplyStrings(std::to_string(freq), std::to_string(multiplier));
+        totalFreq = multiplyStrings(totalFreq, std::to_string(hashMultiplier));
         totalIterations = FindSum(totalIterations, totalFreq);
  
         digits = totalIterations.length();
