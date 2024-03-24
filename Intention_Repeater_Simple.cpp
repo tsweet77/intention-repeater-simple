@@ -34,6 +34,37 @@ std::string FormatTime(long long int seconds_elapsed)
     return ss.str();
 }
 
+std::string multiplyStrings(const std::string &num1, const std::string &num2) {
+    int len1 = num1.size();
+    int len2 = num2.size();
+    std::vector<int> result(len1 + len2, 0);
+
+    // Reverse both the numbers.
+    std::string n1 = num1;
+    std::string n2 = num2;
+
+    // Multiply each digit of second number with the first number
+    for (int i = len2 - 1; i >= 0; i--) {
+        for (int j = len1 - 1; j >= 0; j--) {
+            int mul = (n2[i] - '0') * (n1[j] - '0');
+            int sum = mul + result[i + j + 1];
+
+            result[i + j + 1] = sum % 10;
+            result[i + j] += sum / 10;
+        }
+    }
+
+    // Convert the result vector to string.
+    std::string resultStr;
+    for (int num : result) {
+        if (!(resultStr.empty() && num == 0)) { // Skip leading zeros
+            resultStr.push_back(num + '0');
+        }
+    }
+
+    return resultStr.empty() ? "0" : resultStr; // Return "0" if result is empty
+}
+
 std::string DisplaySuffix(std::string num, int power, std::string designator)
 {
     std::string suffix_array = designator == "Iterations" ? " kMBTqQsSOND" : " kMGTPEZY";
@@ -164,28 +195,11 @@ int main()
             intentionMultiplied += intentionHashed;
             ++hashMultiplier;
         }
-        multiplier = multiplier * hashMultiplier;
     }
 
     std::string totalIterations = "0", totalFreq = "0", processIntention = "";
-    unsigned long long int freq = 0, seconds = 0, benchmark = 0, amplification=1000000000;
+    unsigned long long int freq = 0, seconds = 0;
     int digits = 0, freq_digits = 0;
-
-    //Benchmark for 1 second
-    auto b_start = std::chrono::high_resolution_clock::now();
-    auto b_end = std::chrono::high_resolution_clock::now();
-
-    while ((std::chrono::duration_cast<std::chrono::seconds>(b_end - b_start).count() < 1))
-    {
-        processIntention = intentionMultiplied; // The Intention Repeater Statement
-        benchmark++;
-        b_end = std::chrono::high_resolution_clock::now();
-    }
-    // Benchmark ends here
-    if (amplification > benchmark) // Adjust the amplification based on the benchmark
-    {
-        amplification = benchmark;
-    }
 
     while (true)
     {
@@ -193,16 +207,13 @@ int main()
         auto end = std::chrono::high_resolution_clock::now();
         while ((std::chrono::duration_cast<std::chrono::seconds>(end - start).count() < 1))
         {
-            for (unsigned long long int i = 0; i < amplification; i++)
-            {
-                processIntention = intentionMultiplied; // Assigning the value as intended
-            }
-
-            freq += amplification; // Update the frequency
+            processIntention = intentionMultiplied; // Assigning the value as intended
+            freq++; // Update the frequency
             end = std::chrono::high_resolution_clock::now();
         }
 
-        totalFreq = std::to_string(freq * multiplier);
+        totalFreq = multiplyStrings(std::to_string(freq), std::to_string(multiplier));
+        totalFreq = multiplyStrings(totalFreq, std::to_string(hashMultiplier));
         totalIterations = FindSum(totalIterations, totalFreq);
 
         digits = totalIterations.length();
@@ -214,7 +225,7 @@ int main()
                     << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
                     << " / " << DisplaySuffix(totalFreq, freq_digits - 1, "Frequency") << "Hz)"
                     << std::string(5, ' ') << "\r" << std::flush;
-    } while(1);
+    }
 
     return 0;
 }
