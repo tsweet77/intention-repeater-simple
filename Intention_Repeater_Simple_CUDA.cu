@@ -24,6 +24,7 @@ std::atomic<bool> interrupted(false);
 
 void signalHandler(int signum)
 {
+    cout << "\nInterrupt signal (" << signum << ") received.\n";
     interrupted.store(true);
 }
 
@@ -60,7 +61,7 @@ void print_help()
     cout << " a) --intent or -i, example: --intent \"I am Love.\" [The Intention]" << endl;
     cout << " b) --imem or -m, example: --imem 2 [GB of RAM to Use]" << endl;
     cout << "    --imem 0 to disable Intention Multiplying" << endl;
-    cout << " c) --dur or -d, example: --dur 00:01:00 [Running Duration]" << endl;
+    cout << " c) --dur or -d, example: --dur 00:01:00 [Running Duration HH:MM:SS]" << endl;
     cout << " d) --hashing or -h, example: --hashing y [Use Hashing]" << endl;
     cout << " e) --help or -? [This help]" << endl;
 }
@@ -269,7 +270,7 @@ int main(int argc, char **argv)
     string totalIterations = "0", totalFreq = "0";
     unsigned long long freq = 0, seconds = 0;
 
-    while (true)
+    while (!interrupted)
     {
         auto start = high_resolution_clock::now();
         auto end = start + chrono::duration_cast<chrono::seconds>(chrono::seconds(1));
@@ -306,7 +307,7 @@ int main(int argc, char **argv)
              << string(5, ' ') << "\r" << flush;
         if (param_duration == FormatTime(seconds))
         {
-            break;
+            interrupted = true;
         }
     }
 
