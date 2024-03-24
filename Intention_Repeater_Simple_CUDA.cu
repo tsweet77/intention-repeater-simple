@@ -165,7 +165,7 @@ int main()
     std::transform(useHashing.begin(), useHashing.end(), useHashing.begin(), ::tolower);
 
     std::string intentionMultiplied, intentionHashed = "";
-    long long unsigned int RAM_SIZE = 1024 * 1024 * 1024 * numGBToUse / 2, multiplier = 0, hashMultiplier = 0;
+    long long unsigned int RAM_SIZE = 1024 * 1024 * 512 * numGBToUse, multiplier = 0, hashMultiplier = 1;
 
     std::cout << "Loading..." << string(10,' ') << "\r" << flush;
 
@@ -178,35 +178,22 @@ int main()
 
      // Allocate memory on the GPU for intentionMultiplied, intentionHashed, and freq
     char* d_intentionMultiplied;
-    char* d_intentionHashed;
     unsigned long long int* d_freq;
     cudaMalloc(&d_intentionMultiplied, intentionMultiplied.size());
-    cudaMalloc(&d_intentionHashed, intentionHashed.size());
-    cudaMalloc(&d_freq, sizeof(unsigned long long int));
+     cudaMalloc(&d_freq, sizeof(unsigned long long int));
 
     // Copy intentionMultiplied to the GPU
     cudaMemcpy(d_intentionMultiplied, intentionMultiplied.c_str(), intentionMultiplied.size(), cudaMemcpyHostToDevice);
 
     if (useHashing == "y" || useHashing == "yes") {
-        // Allocate memory for intentionHashed on the GPU
-        cudaMalloc(&d_intentionHashed, intentionMultiplied.size());
-
-        // Launch the CUDA kernel for intention hashing
-        int blockSize = 256;
-        int numBlocks = (intentionMultiplied.size() + blockSize - 1) / blockSize;
-        intentionHashingKernel<<<numBlocks, blockSize>>>(d_intentionMultiplied, d_intentionHashed, intentionMultiplied.size());
-
-        // Copy the hashed intention back to the CPU
-        std::vector<char> hashedIntentionVector(intentionMultiplied.size());
-        cudaMemcpy(hashedIntentionVector.data(), d_intentionHashed, intentionMultiplied.size(), cudaMemcpyDeviceToHost);
-        intentionHashed = std::string(hashedIntentionVector.begin(), hashedIntentionVector.end());
-
+        hashMultiplier--;
+    
+        intentionHashed = picosha2::hash256_hex_string(intentionMultiplied);
         intentionMultiplied = "";
         while (intentionMultiplied.length() < RAM_SIZE) {
             intentionMultiplied += intentionHashed;
             ++hashMultiplier;
         }
-        multiplier = multiplier * hashMultiplier;
 
         // Update intentionMultiplied on the GPU
         cudaMemcpy(d_intentionMultiplied, intentionMultiplied.c_str(), intentionMultiplied.size(), cudaMemcpyHostToDevice);
@@ -218,7 +205,7 @@ int main()
 
     while (true)
     {
-       auto start = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now();
         auto end = std::chrono::high_resolution_clock::now();
         while ((std::chrono::duration_cast<std::chrono::seconds>(end - start).count() < 1)) {
             // Set freq to 0 on the GPU
@@ -235,7 +222,7 @@ int main()
             end = std::chrono::high_resolution_clock::now();
         }
 
-        totalFreq = std::to_string(freq * multiplier);
+        totalFreq = std::to_string(freq * multiplier * hashMultiplier);
         totalIterations = FindSum(totalIterations, totalFreq);
  
         digits = totalIterations.length();
@@ -251,7 +238,6 @@ int main()
 
     // Free allocated memory on the GPU
     cudaFree(d_intentionMultiplied);
-    cudaFree(d_intentionHashed);
     cudaFree(d_freq);
 
     return 0;
