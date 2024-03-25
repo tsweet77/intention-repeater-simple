@@ -109,15 +109,20 @@ void ProcessIntention(int threadId, string intentionMultiplied)
 {
     while (!interrupted)
     {
-        string process_intention;
+        string processIntention;
+        processIntention.reserve(intentionMultiplied.size() + 20); // Adjust based on expected size
         unsigned long long localFreq = 0;
         auto start = chrono::high_resolution_clock::now();
         auto end = start + chrono::seconds(1);
         while (chrono::high_resolution_clock::now() < end)
         {
+            // Clear previous value and reuse the allocated space
+            processIntention.clear();
+            // Append the fixed part and the changing part
+            processIntention.append(intentionMultiplied);
+            processIntention.append(to_string(localFreq));
             // Replace with actual processing if needed
             localFreq++;
-            process_intention = intentionMultiplied;
         }
         freqs[threadId] = localFreq;
     }

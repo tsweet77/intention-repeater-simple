@@ -172,7 +172,8 @@ void print_help()
 int main(int argc, char **argv)
 {
     std::signal(SIGINT, signalHandler);
-    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY", param_hashing = "X", useHashing, param_compress = "X", useCompression;
+    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY";
+    string param_hashing = "X", useHashing, param_compress = "X", useCompression, processIntention;
     int numGBToUse = 1;
 
     for (int i = 1; i < argc; i++)
@@ -311,17 +312,22 @@ int main(int argc, char **argv)
         intentionMultiplied = compressMessage(intentionMultiplied);
     }
 
+    processIntention.reserve(intentionMultiplied.size() + 20); // Adjust based on expected size
+
     string totalIterations = "0", totalFreq = "0";
     unsigned long long freq = 0, seconds = 0;
 
     while (!interrupted)
     {
         auto start = high_resolution_clock::now();
-        auto end = start + chrono::duration_cast<chrono::seconds>(chrono::seconds(1));
-
+        auto end = start + chrono::seconds(1);
         while (high_resolution_clock::now() < end)
         {
-            volatile string processIntention = intentionMultiplied; // Prevent optimization
+            // Clear previous value and reuse the allocated space
+            processIntention.clear();
+            // Append the fixed part and the changing part
+            processIntention.append(intentionMultiplied);
+            processIntention.append(to_string(freq));
             freq++;
         }
 
@@ -335,9 +341,9 @@ int main(int argc, char **argv)
         freq = 0;
 
         cout << "[" + FormatTime(seconds) + "] Repeating:"
-             << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
-             << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention
-             << string(5, ' ') << "\r" << flush;
+            << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
+            << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention
+            << string(5, ' ') << "\r" << flush;
         if (param_duration == FormatTime(seconds))
         {
             interrupted = true;
