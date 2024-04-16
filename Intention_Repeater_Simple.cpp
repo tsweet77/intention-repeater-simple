@@ -4,17 +4,17 @@ by Anthro Teacher, WebGPT and Claude 3 Opus
 To compile: g++ -O3 -Wall -static Intention_Repeater_Simple.cpp -o Intention_Repeater_Simple.exe -lz
 */
 
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <vector>
-#include <chrono>
-#include <thread>
 #include "picosha2.h"
-#include <cstring>
-#include <csignal>
-#include <atomic>
 #include "zlib.h"
+#include <atomic>
+#include <chrono>
+#include <csignal>
+#include <cstring>
+#include <iomanip>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <vector>
 
 using namespace std;
 using namespace std::chrono;
@@ -22,11 +22,13 @@ using namespace std::chrono;
 const int ONE_MINUTE = 60;
 const int ONE_HOUR = 3600;
 
+string VERSION = "v1.2";
+
 std::atomic<bool> interrupted(false);
 
 void signalHandler(int signum)
 {
-    cout << "\nInterrupt signal (" << signum << ") received.\n";
+    // std::cout << "\nInterrupt signal (" << signum << ") received.\n";
     interrupted.store(true);
 }
 
@@ -76,9 +78,8 @@ string FormatTime(long long seconds)
     int secs = seconds % ONE_MINUTE;
 
     ostringstream oss;
-    oss << setw(2) << setfill('0') << hours << ":"
-        << setw(2) << setfill('0') << minutes << ":"
-        << setw(2) << setfill('0') << secs;
+    oss << setw(2) << setfill('0') << hours << ":" << setw(2) << setfill('0')
+        << minutes << ":" << setw(2) << setfill('0') << secs;
 
     return oss.str();
 }
@@ -115,10 +116,12 @@ string MultiplyStrings(const string &num1, const string &num2)
 
 string DisplaySuffix(const string &num, int power, const string &designator)
 {
-    const string suffixArray = designator == "Iterations" ? " kMBTqQsSOND" : " kMGTPEZYR";
+    const string suffixArray =
+        designator == "Iterations" ? " kMBTqQsSOND" : " kMGTPEZYR";
     size_t index = power / 3;
     char suffix = index < suffixArray.length() ? suffixArray[index] : ' ';
-    string result = num.substr(0, power % 3 + 1) + "." + num.substr(power % 3 + 1, 3) + suffix;
+    string result = num.substr(0, power % 3 + 1) + "." +
+                    num.substr(power % 3 + 1, 3) + suffix;
     return result;
 }
 
@@ -156,29 +159,66 @@ string FindSum(const string &a, const string &b)
 
 void print_help()
 {
-    cout << "Intention Repeater Simple by Anthro Teacher." << endl;
-    cout << "Repeats your intention millions of times per second " << endl;
-    cout << "in computer memory, to aid in manifestation." << endl;
-    cout << "Optional Flags:" << endl;
-    cout << " a) --intent or -i, example: --intent \"I am Love.\" [The Intention]" << endl;
-    cout << " b) --imem or -m, example: --imem 2 [GB of RAM to Use]" << endl;
-    cout << "    --imem 0 to disable Intention Multiplying" << endl;
-    cout << " c) --dur or -d, example: --dur 00:01:00 [Running Duration HH:MM:SS]" << endl;
-    cout << " d) --hashing or -h, example: --hashing y [Use Hashing]" << endl;
-    cout << " e) --compress or -c, example: --compress y [Use Compression]" << endl;
-    cout << " f) --help or -? [This help]" << endl;
+    std::cout << "Intention Repeater Simple " << VERSION << " by Anthro Teacher."
+              << endl;
+    std::cout << "Repeats your intention millions of times per second " << endl;
+    std::cout << "in computer memory, to aid in manifestation." << endl;
+    std::cout << "Optional Flags:" << endl;
+    std::cout
+        << " a) --intent or -i, example: --intent \"I am Love.\" [The Intention]"
+        << endl;
+    std::cout << " b) --imem or -m, example: --imem 2 [GB of RAM to Use]" << endl;
+    std::cout << "    --imem 0 to disable Intention Multiplying" << endl;
+    std::cout
+        << " c) --dur or -d, example: --dur 00:01:00 [Running Duration HH:MM:SS]"
+        << endl;
+    std::cout << " d) --hashing or -h, example: --hashing y [Use Hashing]"
+              << endl;
+    std::cout << " e) --compress or -c, example: --compress y [Use Compression]"
+              << endl;
+    std::cout << " f) --file or -f, example: --file \"intentions.txt\" [File to "
+                 "Read Intentions From]"
+              << endl;
+    std::cout << " g) --help or -? [This help]" << endl;
+}
+
+void readFileContents(const std::string &filename,
+                      std::string &intention_file_contents)
+{
+    std::ifstream file(filename, std::ios::binary);
+    if (!file)
+    {
+        std::cerr << "File not found" << std::endl;
+        std::exit(EXIT_FAILURE); // Terminate the program
+    }
+
+    std::ostringstream buffer;
+    char ch;
+    while (file.get(ch))
+    {
+        if (ch != '\0')
+        {
+            buffer.put(ch);
+        }
+    }
+
+    intention_file_contents = buffer.str();
+    file.close();
 }
 
 int main(int argc, char **argv)
 {
     std::signal(SIGINT, signalHandler);
-    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY";
-    string param_hashing = "X", useHashing, param_compress = "X", useCompression, processIntention;
+    string intention = "", intention_display = "", param_intent = "X",
+           param_imem = "X", param_duration = "INFINITY", param_file = "X";
+    string param_hashing = "X", useHashing, param_compress = "X", useCompression,
+           processIntention;
     int numGBToUse = 1;
 
     for (int i = 1; i < argc; i++)
     {
-        if (!strcmp(argv[i], "-?") || !strcmp(argv[i], "--help") || !strcmp(argv[i], "/?"))
+        if (!strcmp(argv[i], "-?") || !strcmp(argv[i], "--help") ||
+            !strcmp(argv[i], "/?"))
         {
             print_help();
             exit(EXIT_SUCCESS);
@@ -203,67 +243,130 @@ int main(int argc, char **argv)
         {
             param_compress = argv[i + 1];
         }
+        else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--file"))
+        {
+            param_file = argv[i + 1];
+        }
     }
 
-    cout << "Intention Repeater Simple" << endl;
-    cout << "by Anthro Teacher, WebGPT and Claude 3 Opus" << endl
-         << endl;
+    std::cout << "Intention Repeater Simple " << VERSION << endl;
+    std::cout << "by Anthro Teacher, WebGPT and Claude 3 Opus" << endl
+              << endl;
 
-    if (param_intent == "X")
+    if (param_file != "X")
     {
-        while (!interrupted)
-        { // Infinite loop
-            std::cout << "Enter your Intention: ";
-            std::getline(std::cin, intention);
-
-            // Check if the intention string is not empty
-            if (!intention.empty())
+        // Open param_intent file and read the full file contents into intention
+        readFileContents(param_file, intention);
+        intention_display = "Contents of: " + param_file;
+    }
+    else
+    {
+        if (param_intent == "X")
+        {
+            while (!interrupted)
             {
-                break; // Exit the loop if an intention has been entered
+                std::cout << "Enter your Intention: ";
+                if (!std::getline(std::cin, intention))
+                {
+                    // If getline fails (e.g., due to an interrupt), break out of the loop immediately
+                    interrupted.store(true); // Ensure the flag is set if not already
+                    return 0;
+                }
+
+                if (!intention.empty())
+                {
+                    break; // Successfully got an intention, exit the loop
+                }
+                else if (!interrupted)
+                {
+                    // Only show the message if we're not interrupted
+                    std::cout << "The intention cannot be empty. Please try again.\n";
+                }
+            }
+            intention_display = intention;
+        }
+        else
+        {
+            intention = param_intent;
+            intention_display = param_intent;
+        }
+    }
+
+    if (!interrupted)
+    {
+        if (param_imem == "X")
+        {
+            std::cout << "GB RAM to Use [Default 1]: ";
+            string input;
+            if (!std::getline(std::cin, input))
+            {
+                // If getline fails due to interruption
+                interrupted.store(true); // Ensure the flag is properly set
+                if (interrupted)
+                {
+                    // std::cerr << "Interrupted. Exiting configuration.\n";
+                    return 0; // Exit or handle as necessary
+                }
             }
 
-            // Optional: Inform the user that the intention cannot be empty
-            std::cout << "The intention cannot be empty. Please try again.\n";
+            if (!input.empty())
+            {
+                try
+                {
+                    numGBToUse = stoi(input);
+                }
+                catch (const std::invalid_argument &e)
+                {
+                    // std::cerr << "Invalid input, using default of 1 GB.\n";
+                    numGBToUse = 1;
+                }
+                catch (const std::out_of_range &e)
+                {
+                    // std::cerr << "Input out of range, using default of 1 GB.\n";
+                    numGBToUse = 1;
+                }
+            }
         }
-    }
-    else
-    {
-        intention = param_intent;
-    }
-
-    if (param_imem == "X")
-    {
-        cout << "GB RAM to Use [Default 1]: ";
-        string input;
-        getline(cin, input);
-        if (!input.empty())
+        else
         {
-            numGBToUse = stoi(input);
+            numGBToUse = stoi(param_imem);
         }
     }
-    else
-    {
-        numGBToUse = stoi(param_imem);
-    }
 
-    if (param_hashing == "X")
+    if (!interrupted && param_hashing == "X")
     {
-        cout << "Use Hashing (y/N): ";
-        getline(cin, useHashing);
+        std::cout << "Use Hashing (y/N): ";
+        if (!std::getline(std::cin, useHashing))
+        {
+            interrupted.store(true);
+            if (interrupted)
+            {
+                // std::cerr << "Interrupted during hashing input. Exiting configuration.\n";
+                return 0;
+            }
+        }
         transform(useHashing.begin(), useHashing.end(), useHashing.begin(), ::tolower);
     }
-    else
+    else if (!interrupted)
     {
         useHashing = param_hashing;
     }
 
-    if (param_compress == "X")
+    if (!interrupted && param_compress == "X")
     {
-        cout << "Use Compression (y/N): ";
-        getline(cin, useCompression);
+        std::cout << "Use Compression (y/N): ";
+        if (!std::getline(std::cin, useCompression))
+        {
+            interrupted.store(true);
+            if (interrupted)
+            {
+                // std::cerr << "Interrupted during compression input. Exiting configuration.\n";
+                return 0;
+            }
+        }
         transform(useCompression.begin(), useCompression.end(), useCompression.begin(), ::tolower);
     }
-    else
+    else if (!interrupted)
     {
         useCompression = param_compress;
     }
@@ -272,7 +375,14 @@ int main(int argc, char **argv)
     size_t ramSize = 1024ULL * 1024 * 1024 * numGBToUse / 2;
     size_t multiplier = 0, hashMultiplier = 1;
 
-    cout << "Loading..." << string(10, ' ') << "\r" << flush;
+    if (!interrupted)
+    {
+        std::cout << "Loading..." << string(10, ' ') << "\r" << flush;
+    }
+    else
+    {
+        return 0;
+    }
 
     if (numGBToUse > 0)
     {
@@ -312,7 +422,8 @@ int main(int argc, char **argv)
         intentionMultiplied = compressMessage(intentionMultiplied);
     }
 
-    processIntention.reserve(intentionMultiplied.size() + 20); // Adjust based on expected size
+    processIntention.reserve(intentionMultiplied.size() +
+                             20); // Adjust based on expected size
 
     string totalIterations = "0", totalFreq = "0";
     unsigned long long freq = 0, seconds = 0;
@@ -340,13 +451,20 @@ int main(int argc, char **argv)
         ++seconds;
         freq = 0;
 
-        cout << "[" + FormatTime(seconds) + "] Repeating:"
-            << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
-            << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention
-            << string(5, ' ') << "\r" << flush;
+        std::cout << "[" + FormatTime(seconds) + "] Repeating:"
+                  << " ("
+                  << DisplaySuffix(totalIterations, digits - 1, "Iterations")
+                  << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency")
+                  << "Hz): " << intention_display << string(5, ' ') << "\r"
+                  << flush;
         if (param_duration == FormatTime(seconds))
         {
             interrupted = true;
+        }
+
+        if (interrupted)
+        {
+            break;
         }
     }
 

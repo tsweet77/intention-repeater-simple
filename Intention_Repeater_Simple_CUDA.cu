@@ -5,16 +5,16 @@ To compile: nvcc Intention_Repeater_Simple_CUDA.cu -o Intention_Repeater_Simple_
 To run: Intention_Repeater_Simple_CUDA.exe --intent "I am Love." --imem 1 --hashing y --compress n --dur 00:00:10
 */
 
+#include "picosha2.h"
+#include "zlib.h"
 #include <iostream>
 #include <iomanip>
 #include <string>
 #include <vector>
 #include <chrono>
-#include "picosha2.h"
 #include <cuda_runtime.h>
 #include <csignal>
 #include <atomic>
-#include "zlib.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -22,11 +22,13 @@ using namespace std::chrono;
 const int ONE_MINUTE = 60;
 const int ONE_HOUR = 3600;
 
+string VERSION = "v1.2";
+
 std::atomic<bool> interrupted(false);
 
 void signalHandler(int signum)
 {
-    cout << "\nInterrupt signal (" << signum << ") received.\n";
+    //cout << "\nInterrupt signal (" << signum << ") received.\n";
     interrupted.store(true);
 }
 
@@ -105,7 +107,8 @@ void print_help()
     cout << " c) --dur or -d, example: --dur 00:01:00 [Running Duration HH:MM:SS]" << endl;
     cout << " d) --hashing or -h, example: --hashing y [Use Hashing]" << endl;
     cout << " e) --compress or -c, example: --compress y [Use Compression]" << endl;
-    cout << " f) --help or -? [This help]" << endl;
+    cout << " f) --file or -f, example: --file \"intentions.txt\" [File to Read Intentions From]" << endl;
+    cout << " g) --help or -? [This help]" << endl;
 }
 
 string DisplaySuffix(const string &num, int power, const string &designator)
@@ -179,10 +182,39 @@ string MultiplyStrings(const string &num1, const string &num2)
     return resultStr.empty() ? "0" : resultStr;
 }
 
+void readFileContents(const std::string &filename,
+                      std::string &intention_file_contents)
+{
+    std::ifstream file(filename, std::ios::binary);
+    if (!file)
+    {
+        std::cerr << "File not found" << std::endl;
+        std::exit(EXIT_FAILURE); // Terminate the program
+    }
+
+    std::ostringstream buffer;
+    char ch;
+    while (file.get(ch))
+    {
+        if (ch != '\0')
+        {
+            buffer.put(ch);
+        }
+    }
+
+    intention_file_contents = buffer.str();
+    file.close();
+}
+
 int main(int argc, char **argv)
 {
+    std::cout << "Intention Repeater Simple CUDA " << VERSION << endl;
+    std::cout << "by Anthro Teacher and WebGPT" << endl
+              << endl;
+
     std::signal(SIGINT, signalHandler);
-    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY", param_hashing = "X", useHashing, useCompression, param_compress="X";
+    string intention = "", param_intent = "X", param_imem = "X", param_duration = "INFINITY", param_hashing = "X";
+    string useHashing, useCompression, param_compress = "X", param_file = "X", intention_display = "";
     int numGBToUse = 1;
 
     for (int i = 1; i < argc; i++)
@@ -212,76 +244,142 @@ int main(int argc, char **argv)
         {
             param_compress = argv[i + 1];
         }
+        else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--file"))
+        {
+            param_file = argv[i + 1];
+        }
     }
-    cout << "Intention Repeater Simple CUDA" << endl;
-    cout << "by Anthro Teacher, WebGPT and Claude 3 Opus" << endl
-         << endl;
 
-    if (param_intent == "X")
+    if (param_file != "X")
     {
-        while (!interrupted)
-        { // Infinite loop
-            std::cout << "Enter your Intention: ";
-            std::getline(std::cin, intention);
-
-            // Check if the intention string is not empty
-            if (!intention.empty())
+        // Open param_intent file and read the full file contents into intention
+        readFileContents(param_file, intention);
+        intention_display = "Contents of: " + param_file;
+    }
+    else
+    {
+        if (param_intent == "X")
+        {
+            while (!interrupted)
             {
-                break; // Exit the loop if an intention has been entered
+                std::cout << "Enter your Intention: ";
+                if (!std::getline(std::cin, intention))
+                {
+                    // If getline fails (e.g., due to an interrupt), break out of the loop immediately
+                    interrupted.store(true); // Ensure the flag is set if not already
+                    return 0;
+                }
+
+                if (!intention.empty())
+                {
+                    break; // Successfully got an intention, exit the loop
+                }
+                else if (!interrupted)
+                {
+                    // Only show the message if we're not interrupted
+                    std::cout << "The intention cannot be empty. Please try again.\n";
+                }
+            }
+            intention_display = intention;
+        }
+        else
+        {
+            intention = param_intent;
+            intention_display = param_intent;
+        }
+    }
+
+    if (!interrupted)
+    {
+        if (param_imem == "X")
+        {
+            std::cout << "GB RAM to Use [Default 1]: ";
+            string input;
+            if (!std::getline(std::cin, input))
+            {
+                // If getline fails due to interruption
+                interrupted.store(true); // Ensure the flag is properly set
+                if (interrupted)
+                {
+                    // std::cerr << "Interrupted. Exiting configuration.\n";
+                    return 0; // Exit or handle as necessary
+                }
             }
 
-            // Optional: Inform the user that the intention cannot be empty
-            std::cout << "The intention cannot be empty. Please try again.\n";
+            if (!input.empty())
+            {
+                try
+                {
+                    numGBToUse = stoi(input);
+                }
+                catch (const std::invalid_argument &e)
+                {
+                    // std::cerr << "Invalid input, using default of 1 GB.\n";
+                    numGBToUse = 1;
+                }
+                catch (const std::out_of_range &e)
+                {
+                    // std::cerr << "Input out of range, using default of 1 GB.\n";
+                    numGBToUse = 1;
+                }
+            }
         }
-    }
-    else
-    {
-        intention = param_intent;
-    }
-
-    if (param_imem == "X")
-    {
-        cout << "GB RAM to Use [Default 1]: ";
-        string input;
-        getline(cin, input);
-        if (!input.empty())
+        else
         {
-            numGBToUse = stoi(input);
+            numGBToUse = stoi(param_imem);
         }
     }
-    else
-    {
-        numGBToUse = stoi(param_imem);
-    }
 
-    if (param_hashing == "X")
+    if (!interrupted && param_hashing == "X")
     {
-        cout << "Use Hashing (y/N): ";
-        getline(cin, useHashing);
+        std::cout << "Use Hashing (y/N): ";
+        if (!std::getline(std::cin, useHashing))
+        {
+            interrupted.store(true);
+            if (interrupted)
+            {
+                // std::cerr << "Interrupted during hashing input. Exiting configuration.\n";
+                return 0;
+            }
+        }
         transform(useHashing.begin(), useHashing.end(), useHashing.begin(), ::tolower);
     }
-    else
+    else if (!interrupted)
     {
         useHashing = param_hashing;
     }
 
-    if (param_compress == "X")
+    if (!interrupted && param_compress == "X")
     {
-        cout << "Use Compression (y/N): ";
-        getline(cin, useCompression);
+        std::cout << "Use Compression (y/N): ";
+        if (!std::getline(std::cin, useCompression))
+        {
+            interrupted.store(true);
+            if (interrupted)
+            {
+                // std::cerr << "Interrupted during compression input. Exiting configuration.\n";
+                return 0;
+            }
+        }
         transform(useCompression.begin(), useCompression.end(), useCompression.begin(), ::tolower);
     }
-    else
+    else if (!interrupted)
     {
         useCompression = param_compress;
     }
-
 
     string intentionMultiplied, intentionHashed;
     size_t ramSize = 1024ULL * 1024 * 512 * numGBToUse;
     size_t multiplier = 0, hashMultiplier = 1;
 
-    cout << "Loading..." << string(10, ' ') << "\r" << flush;
+    if (!interrupted)
+    {
+        std::cout << "Loading..." << string(10, ' ') << "\r" << flush;
+    }
+    else
+    {
+        return 0;
+    }
 
     if (numGBToUse > 0)
     {
@@ -314,7 +412,9 @@ int main(int argc, char **argv)
             intentionMultiplied = intentionHashed;
             hashMultiplier = 1;
         }
-    } else {
+    }
+    else
+    {
         hashMultiplier = 1;
     }
 
@@ -366,13 +466,18 @@ int main(int argc, char **argv)
         ++seconds;
         freq = 0;
 
-        std::cout << "[" + FormatTime(seconds) + "] Repeating:"
-             << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
-             << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention
-             << string(5, ' ') << "\r" << flush;
+        std::cout << "[" + FormatTime(seconds) + "] "
+                  << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
+                  << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention_display
+                  << string(5, ' ') << "\r" << flush;
         if (param_duration == FormatTime(seconds))
         {
-             interrupted = true;
+            interrupted = true;
+        }
+
+        if (interrupted)
+        {
+            break;
         }
     }
 

@@ -1,7 +1,8 @@
 /*
-Intention Repeater Simple
+Intention Repeater Simple CUDA
 by Anthro Teacher, WebGPT and Claude 3 Opus
-To compile: g++ -O3 -Wall -static Intention_Repeater_Simple.cpp -o Intention_Repeater_Simple.exe -lz
+To compile: nvcc Intention_Repeater_Simple_CUDA.cu -o Intention_Repeater_Simple_CUDA.exe -L/Users/tswee/miniconda3/Library/lib -lz
+To run: Intention_Repeater_Simple_CUDA.exe --intent "I am Love." --imem 1 --hashing y --compress n --dur 00:00:10
 */
 
 #include <iostream>
@@ -9,9 +10,8 @@ To compile: g++ -O3 -Wall -static Intention_Repeater_Simple.cpp -o Intention_Rep
 #include <string>
 #include <vector>
 #include <chrono>
-#include <thread>
 #include "picosha2.h"
-#include <cstring>
+#include <cuda_runtime.h>
 #include <csignal>
 #include <atomic>
 #include "zlib.h"
@@ -22,12 +22,24 @@ using namespace std::chrono;
 const int ONE_MINUTE = 60;
 const int ONE_HOUR = 3600;
 
+string VERSION = "v1.1";
+
 std::atomic<bool> interrupted(false);
 
 void signalHandler(int signum)
 {
     cout << "\nInterrupt signal (" << signum << ") received.\n";
     interrupted.store(true);
+}
+
+// CUDA kernel to perform intention repeating and frequency updating
+__global__ void intentionRepeaterKernel(const char *intentionMultiplied, unsigned long long int *freq, size_t intentionSize)
+{
+    unsigned long long int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < intentionSize)
+    {
+        atomicAdd(freq, 1);
+    }
 }
 
 std::string compressMessage(const std::string &message)
@@ -83,34 +95,20 @@ string FormatTime(long long seconds)
     return oss.str();
 }
 
-string MultiplyStrings(const string &num1, const string &num2)
+void print_help()
 {
-    int len1 = num1.size();
-    int len2 = num2.size();
-    vector<int> result(len1 + len2, 0);
-
-    for (int i = len1 - 1; i >= 0; --i)
-    {
-        for (int j = len2 - 1; j >= 0; --j)
-        {
-            int mul = (num1[i] - '0') * (num2[j] - '0');
-            int sum = mul + result[i + j + 1];
-
-            result[i + j + 1] = sum % 10;
-            result[i + j] += sum / 10;
-        }
-    }
-
-    string resultStr;
-    for (int num : result)
-    {
-        if (!(resultStr.empty() && num == 0))
-        {
-            resultStr.push_back(num + '0');
-        }
-    }
-
-    return resultStr.empty() ? "0" : resultStr;
+    cout << "Intention Repeater Simple CUDA by Anthro Teacher." << endl;
+    cout << "Repeats your intention millions of times per second " << endl;
+    cout << "in computer memory, to aid in manifestation." << endl;
+    cout << "Optional Flags:" << endl;
+    cout << " a) --intent or -i, example: --intent \"I am Love.\" [The Intention]" << endl;
+    cout << " b) --imem or -m, example: --imem 2 [GB of RAM to Use]" << endl;
+    cout << "    --imem 0 to disable Intention Multiplying" << endl;
+    cout << " c) --dur or -d, example: --dur 00:01:00 [Running Duration HH:MM:SS]" << endl;
+    cout << " d) --hashing or -h, example: --hashing y [Use Hashing]" << endl;
+    cout << " e) --compress or -c, example: --compress y [Use Compression]" << endl;
+    cout << " f) --file or -f, example: --file \"intentions.txt\" [File to Read Intentions From]" << endl;
+    cout << " g) --help or -? [This help]" << endl;
 }
 
 string DisplaySuffix(const string &num, int power, const string &designator)
@@ -154,26 +152,69 @@ string FindSum(const string &a, const string &b)
     return result;
 }
 
-void print_help()
+string MultiplyStrings(const string &num1, const string &num2)
 {
-    cout << "Intention Repeater Simple by Anthro Teacher." << endl;
-    cout << "Repeats your intention millions of times per second " << endl;
-    cout << "in computer memory, to aid in manifestation." << endl;
-    cout << "Optional Flags:" << endl;
-    cout << " a) --intent or -i, example: --intent \"I am Love.\" [The Intention]" << endl;
-    cout << " b) --imem or -m, example: --imem 2 [GB of RAM to Use]" << endl;
-    cout << "    --imem 0 to disable Intention Multiplying" << endl;
-    cout << " c) --dur or -d, example: --dur 00:01:00 [Running Duration HH:MM:SS]" << endl;
-    cout << " d) --hashing or -h, example: --hashing y [Use Hashing]" << endl;
-    cout << " e) --compress or -c, example: --compress y [Use Compression]" << endl;
-    cout << " f) --help or -? [This help]" << endl;
+    int len1 = num1.size();
+    int len2 = num2.size();
+    vector<int> result(len1 + len2, 0);
+
+    for (int i = len1 - 1; i >= 0; --i)
+    {
+        for (int j = len2 - 1; j >= 0; --j)
+        {
+            int mul = (num1[i] - '0') * (num2[j] - '0');
+            int sum = mul + result[i + j + 1];
+
+            result[i + j + 1] = sum % 10;
+            result[i + j] += sum / 10;
+        }
+    }
+
+    string resultStr;
+    for (int num : result)
+    {
+        if (!(resultStr.empty() && num == 0))
+        {
+            resultStr.push_back(num + '0');
+        }
+    }
+
+    return resultStr.empty() ? "0" : resultStr;
+}
+
+void readFileContents(const std::string &filename,
+                      std::string &intention_file_contents)
+{
+    std::ifstream file(filename, std::ios::binary);
+    if (!file)
+    {
+        std::cerr << "File not found" << std::endl;
+        std::exit(EXIT_FAILURE); // Terminate the program
+    }
+
+    std::ostringstream buffer;
+    char ch;
+    while (file.get(ch))
+    {
+        if (ch != '\0')
+        {
+            buffer.put(ch);
+        }
+    }
+
+    intention_file_contents = buffer.str();
+    file.close();
 }
 
 int main(int argc, char **argv)
 {
+    std::cout << "Intention Repeater Simple CUDA " << VERSION << endl;
+    std::cout << "by Anthro Teacher and WebGPT" << endl
+              << endl;
+
     std::signal(SIGINT, signalHandler);
-    string intention, param_intent = "X", param_imem = "X", param_duration = "INFINITY";
-    string param_hashing = "X", useHashing, param_compress = "X", useCompression, processIntention;
+    string intention = "", param_intent = "X", param_imem = "X", param_duration = "INFINITY", param_hashing = "X";
+    string useHashing, useCompression, param_compress = "X", param_file = "X", intention_display = "";
     int numGBToUse = 1;
 
     for (int i = 1; i < argc; i++)
@@ -203,32 +244,46 @@ int main(int argc, char **argv)
         {
             param_compress = argv[i + 1];
         }
+        else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--file"))
+        {
+            param_file = argv[i + 1];
+        }
     }
-
-    cout << "Intention Repeater Simple" << endl;
+    cout << "Intention Repeater Simple CUDA " << VERSION << endl;
     cout << "by Anthro Teacher, WebGPT and Claude 3 Opus" << endl
          << endl;
 
-    if (param_intent == "X")
+    if (param_file != "X")
     {
-        while (!interrupted)
-        { // Infinite loop
-            std::cout << "Enter your Intention: ";
-            std::getline(std::cin, intention);
-
-            // Check if the intention string is not empty
-            if (!intention.empty())
-            {
-                break; // Exit the loop if an intention has been entered
-            }
-
-            // Optional: Inform the user that the intention cannot be empty
-            std::cout << "The intention cannot be empty. Please try again.\n";
-        }
+        // Open param_intent file and read the full file contents into intention
+        readFileContents(param_file, intention);
+        intention_display = "Contents of: " + param_file;
     }
     else
     {
-        intention = param_intent;
+        if (param_intent == "X")
+        {
+            while (!interrupted)
+            { // Infinite loop
+                std::cout << "Enter your Intention: ";
+                std::getline(std::cin, intention);
+
+                // Check if the intention string is not empty
+                if (!intention.empty())
+                {
+                    break; // Exit the loop if an intention has been entered
+                }
+
+                // Optional: Inform the user that the intention cannot be empty
+                std::cout << "The intention cannot be empty. Please try again.\n";
+            }
+            intention_display = intention;
+        }
+        else
+        {
+            intention = param_intent;
+            intention_display = param_intent;
+        }
     }
 
     if (param_imem == "X")
@@ -269,7 +324,7 @@ int main(int argc, char **argv)
     }
 
     string intentionMultiplied, intentionHashed;
-    size_t ramSize = 1024ULL * 1024 * 1024 * numGBToUse / 2;
+    size_t ramSize = 1024ULL * 1024 * 512 * numGBToUse;
     size_t multiplier = 0, hashMultiplier = 1;
 
     cout << "Loading..." << string(10, ' ') << "\r" << flush;
@@ -306,13 +361,24 @@ int main(int argc, char **argv)
             hashMultiplier = 1;
         }
     }
+    else
+    {
+        hashMultiplier = 1;
+    }
 
     if (useCompression == "y" || useCompression == "yes")
     {
         intentionMultiplied = compressMessage(intentionMultiplied);
     }
 
-    processIntention.reserve(intentionMultiplied.size() + 20); // Adjust based on expected size
+    // Allocate memory on the GPU for intentionMultiplied and freq
+    char *d_intentionMultiplied;
+    unsigned long long int *d_freq;
+    cudaMalloc(&d_intentionMultiplied, intentionMultiplied.size());
+    cudaMalloc(&d_freq, sizeof(unsigned long long int));
+
+    // Copy intentionMultiplied to the GPU
+    cudaMemcpy(d_intentionMultiplied, intentionMultiplied.c_str(), intentionMultiplied.size(), cudaMemcpyHostToDevice);
 
     string totalIterations = "0", totalFreq = "0";
     unsigned long long freq = 0, seconds = 0;
@@ -320,15 +386,23 @@ int main(int argc, char **argv)
     while (!interrupted)
     {
         auto start = high_resolution_clock::now();
-        auto end = start + chrono::seconds(1);
+        auto end = start + chrono::duration_cast<chrono::seconds>(chrono::seconds(1));
+
+        // Set freq to 0 on the GPU
+        cudaMemset(d_freq, 0, sizeof(unsigned long long int));
+
         while (high_resolution_clock::now() < end)
         {
-            // Clear previous value and reuse the allocated space
-            processIntention.clear();
-            // Append the fixed part and the changing part
-            processIntention.append(intentionMultiplied);
-            processIntention.append(to_string(freq));
-            freq++;
+            // Launch the CUDA kernel for intention repeating and frequency updating
+            int blockSize = 256;
+            int numBlocks = (intentionMultiplied.size() + blockSize - 1) / blockSize;
+            intentionRepeaterKernel<<<numBlocks, blockSize>>>(d_intentionMultiplied, d_freq, intentionMultiplied.size());
+
+            // Wait for the GPU to finish before accessing on host
+            cudaDeviceSynchronize();
+
+            // Copy the updated freq back to the CPU
+            cudaMemcpy(&freq, d_freq, sizeof(unsigned long long int), cudaMemcpyDeviceToHost);
         }
 
         totalFreq = MultiplyStrings(to_string(freq), to_string(multiplier));
@@ -340,10 +414,10 @@ int main(int argc, char **argv)
         ++seconds;
         freq = 0;
 
-        cout << "[" + FormatTime(seconds) + "] Repeating:"
-            << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
-            << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention
-            << string(5, ' ') << "\r" << flush;
+        std::cout << "[" + FormatTime(seconds) + "] Repeating:"
+                  << " (" << DisplaySuffix(totalIterations, digits - 1, "Iterations")
+                  << " / " << DisplaySuffix(totalFreq, freqDigits - 1, "Frequency") << "Hz): " << intention_display
+                  << string(5, ' ') << "\r" << flush;
         if (param_duration == FormatTime(seconds))
         {
             interrupted = true;
@@ -351,5 +425,9 @@ int main(int argc, char **argv)
     }
 
     std::cout << endl;
+    // Free allocated memory on the GPU
+    cudaFree(d_intentionMultiplied);
+    cudaFree(d_freq);
+
     return 0;
 }
