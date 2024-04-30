@@ -1,4 +1,4 @@
-Intention Repeater Simple Multithreaded v1.3
+Intention Repeater Simple Multithreaded v1.4
 by Anthro Teacher (AnthroHeart) aka Thomas Sweet
 Website: http://www.intentionrepeater.com
 Email: healing@intentionrepeater.com
